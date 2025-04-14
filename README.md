@@ -1,4 +1,4 @@
-# Chatbot Médico - Proyecto Fullstack
+# Chatbot AIUDA Chatbot de Asistencia Médica - Proyecto Fullstack
 Este proyecto consiste en una aplicación web para asistencia médica a todo usuario, principalmente para estudiantes UTP.
 
 ## 🧠 Arquitectura
