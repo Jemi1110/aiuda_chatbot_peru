@@ -1,0 +1,476 @@
+require('dotenv').config();
+const express = require('express');
+const axios = require('axios');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const { createClient } = require('@supabase/supabase-js');
+
+// Initialize Express app
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+
+// Validate environment variables
+const requiredEnvVars = [
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'STACK_AI_API_URL',
+  'STACK_AI_API_KEY'
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingEnvVars.length > 0) {
+  console.error('Missing required environment variables:', missingEnvVars);
+  process.exit(1);
+}
+
+// Validate URLs
+const validateUrl = (url) => {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Validate API URLs
+const apiUrls = {
+  stackAi: process.env.STACK_AI_API_URL,
+  supabase: process.env.SUPABASE_URL
+};
+
+const invalidUrls = Object.entries(apiUrls)
+  .filter(([key, url]) => !validateUrl(url))
+  .map(([key, url]) => ({ key, url }));
+
+if (invalidUrls.length > 0) {
+  console.error('Invalid URLs found:');
+  invalidUrls.forEach(({ key, url }) => {
+    console.error(`${key} URL is invalid:`, url);
+  });
+  process.exit(1);
+}
+
+// Initialize Supabase clients
+let supabaseAdmin;
+try {
+  supabaseAdmin = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
+  console.log('✅ Supabase admin client initialized successfully');
+} catch (error) {
+  console.error('❌ Failed to initialize Supabase admin client:', error);
+  process.exit(1);
+}
+
+// Test Supabase connection
+const testSupabaseConnection = async () => {
+  try {
+    const { data, error } = await supabaseAdmin.auth.getUser();
+    if (error) {
+      console.log('⚠️ Supabase connection test skipped (no auth session)');
+      return;
+    }
+    console.log('✅ Supabase connection test passed');
+  } catch (error) {
+    console.log('⚠️ Supabase connection test skipped:', error.message);
+  }
+};
+
+// Run connection test
+testSupabaseConnection();
+
+const port = process.env.PORT || 4000;
+
+// Log configuration
+console.log('=== Server Configuration ===');
+console.log('Port:', port);
+console.log('Supabase URL:', process.env.SUPABASE_URL);
+console.log('Stack AI URL:', process.env.STACK_AI_API_URL);
+console.log('Stack AI Key:', process.env.STACK_AI_API_KEY ? '***' : 'NO API KEY');
+
+// ===== RUTA POST (Stack AI) =====
+app.post('/api/stack-ai', async (req, res) => {
+  try {
+    // Log request details
+    console.log('=== Stack AI Request ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    console.log('Method:', req.method);
+    console.log('URL:', req.url);
+    console.log('Authorization header:', req.headers.authorization);
+
+    // Get token from header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('❌ Invalid authorization header:', authHeader);
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid authorization header'
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    console.log('✅ Token received:', token.substring(0, 10) + '...');
+
+    // Create Supabase client with user token
+    const supabaseUser = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false
+        }
+      }
+    );
+
+    // Set the access token
+    supabaseUser.auth.setAuth(token);
+
+    try {
+      // Verify the JWT token directly
+      console.log('Attempting to verify token with Supabase');
+      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+      console.log('Token verification result:', {
+        success: !authError,
+        hasUser: !!user,
+        error: authError?.message
+      });
+
+      if (authError || !user) {
+        console.error('❌ Token verification failed:', authError?.message);
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid token'
+        });
+      }
+
+      // Get the message from the request body
+      const { messages } = req.body;
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        console.error('❌ Invalid message format');
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid message format. Expected messages array'
+        });
+      }
+
+      const lastMessage = messages[messages.length - 1];
+      if (!lastMessage.content) {
+        console.error('❌ Missing message content');
+        return res.status(400).json({
+          success: false,
+          error: 'Missing message content'
+        });
+      }
+
+      console.log('Processing message:', {
+        contentLength: lastMessage.content.length,
+        role: lastMessage.role
+      });
+
+      // Aquí iría la lógica para procesar el mensaje con Stack AI
+      const response = {
+        success: true,
+        message: 'Mensaje procesado correctamente'
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error('❌ Error processing message:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error processing message'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in stack-ai endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+// Start server
+app.listen(port, () => {
+  console.log(`✅ Server running on port ${port}`);
+});
+        console.error('❌ Error getting chat:', chatError);
+        return res.status(500).json({
+          success: false,
+          error: 'Error getting chat data: ' + (chatError.message || 'Unknown error')
+        });
+      }
+
+      if (!existingChat) {
+        console.log('Creating new chat for user');
+        const { data: newChat, error: newChatError } = await supabaseAdmin
+          .from('chats')
+          .insert({
+            title: 'New Chat',
+            user_id: user.id,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (newChatError) {
+          console.error('❌ Error creating new chat:', newChatError);
+          return res.status(500).json({
+            success: false,
+            error: 'Error creating new chat: ' + (newChatError.message || 'Unknown error')
+          });
+        }
+
+        chatData = newChat;
+      } else {
+        chatData = existingChat;
+      }
+
+      console.log('✅ Using chat:', chatData.id);
+
+      // Get in-1 from request
+      const { "in-1": input } = req.body;
+      if (!input) {
+        console.error('❌ Missing input in request body');
+        return res.status(400).json({
+          success: false,
+          error: 'Missing input in request body'
+        });
+      }
+
+      console.log('✅ Received input:', input.substring(0, 50) + '...');
+
+      // Call Stack AI API
+      try {
+        const stackAiResponse = await axios.post(
+          process.env.STACK_AI_API_URL,
+          { "in-1": input },
+          {
+            headers: {
+              'Authorization': `Bearer ${process.env.STACK_AI_API_KEY}`
+            }
+          headers: {
+            'Authorization': `Bearer ${process.env.STACK_AI_API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('✅ Stack AI API Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: response.data
+        });
+
+        // Extract bot message from response
+        const botMessage = response.data?.outputs?.['out-0'] || response.data?.outputs?.['out-1'];
+        if (!botMessage) {
+          console.error('No message received from Stack AI:', response.data);
+          throw new Error('No message received from Stack AI');
+        }
+
+        // Save messages to database using admin client
+        await saveMessages(chatData, user, prompt, botMessage, supabaseAdmin);
+
+        // Send response to frontend
+        res.json({
+          success: true,
+          data: {
+            answer: botMessage,
+            runId: response.data.run_id,
+            citations: response.data.citations
+          }
+        });
+      } catch (error) {
+        console.error('❌ Error calling Stack AI API:', {
+          message: error.message,
+          stack: error.stack,
+          response: error.response?.data,
+          status: error.response?.status,
+          statusText: error.response?.statusText
+        });
+        
+        // Send error response to frontend
+        res.status(500).json({
+          success: false,
+          error: `Error calling Stack AI API: ${error.message}`,
+          details: {
+            status: error.response?.status,
+            statusText: error.response?.statusText
+          }
+        });
+      }
+    } catch (error) {
+      console.error('❌ Global error in Stack AI route:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      // Send error response to frontend
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error: ' + error.message
+      });
+    }
+  } catch (error) {
+    console.error('❌ Global error in Stack AI route:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
+    // Send error response to frontend
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error: ' + error.message
+    });
+  }
+});
+
+// Helper function to save messages to database
+const saveMessages = async (chatData, user, prompt, botMessage, supabaseAdmin) => {
+  try {
+    if (!prompt || !botMessage) {
+      throw new Error('Invalid message content: prompt and botMessage are required');
+    }
+
+    // Save user message
+    const { data: messageData, error: messageError } = await supabaseAdmin
+      .from('chat_history')
+      .insert({
+        content: prompt,
+        sender: 'user',
+        chat_id: chatData?.id,
+        user_id: user.id,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (messageError) {
+      console.error('Error saving user message:', messageError);
+      throw messageError;
+    }
+
+    // Save bot response
+    const { data: botMessageData, error: botMessageError } = await supabaseAdmin
+      .from('chat_history')
+      .insert({
+        content: botMessage,
+        sender: 'bot',
+        chat_id: chatData?.id,
+        user_id: user.id,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (botMessageError) {
+      console.error('Error saving bot message:', botMessageError);
+      throw botMessageError;
+    }
+
+    return { messageData, botMessageData };
+  } catch (error) {
+    console.error('Error saving messages:', error);
+    throw error;
+  }
+};
+
+// Start server
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+});
+
+// Add new endpoint for deleting chats
+app.delete('/api/chats/:chatId', async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid authorization header'
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const supabaseUser = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    // Verify user
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized'
+      });
+    }
+
+    // Delete chat messages first (due to foreign key constraint)
+    const { error: messagesError } = await supabaseAdmin
+      .from('chat_history')
+      .delete()
+      .eq('chat_id', chatId)
+      .eq('user_id', user.id);
+
+    if (messagesError) {
+      console.error('Error deleting chat messages:', messagesError);
+      return res.status(500).json({
+        success: false,
+        error: 'Error deleting chat messages'
+      });
+    }
+
+    // Delete the chat
+    const { error: chatError } = await supabaseAdmin
+      .from('chats')
+      .delete()
+      .eq('id', chatId)
+      .eq('user_id', user.id);
+
+    if (chatError) {
+      console.error('Error deleting chat:', chatError);
+      return res.status(500).json({
+        success: false,
+        error: 'Error deleting chat'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Chat deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error in delete chat endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});

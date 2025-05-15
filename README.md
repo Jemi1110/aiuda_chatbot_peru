@@ -8,12 +8,17 @@ Este proyecto consiste en una aplicación web para asistencia médica a todo usu
 - Usa Supabase para autenticación y almacenamiento de registros de usuarios.
 - Desplegada en Vercel.
 
-### 📁 backend/
+### 📁 backend/OPCIÓN 1
 - API con FastAPI.
 - Usa pandas para análisis de síntomas.
 - Desplegada en Render.
 - Uso de base de datos de Kaggle.
 - Python
+
+### 📁 backend/OPCIÓN 2
+- USO DE OPENAI
+- STACK.AI HERRAMIENTA DE IA
+- API PARA CONECTAR BACKEND A FRONTEND
 
 ## 🚀 Cómo iniciar el proyecto
 
@@ -39,6 +44,8 @@ npm run dev
 
 ```bash
 cd backend
+npm init -y          # Crea package.json
+npm install express axios cors dotenv
 ```
 
 ### Desarrollado con:
@@ -47,6 +54,7 @@ cd backend
 [Realtime REST API] - Row Level Security (RLS) (Para proteger datos por usuario)
 - TailwindCSS + shadcn/ui
 
+## PREVISTOS
 - FastAPI
 - Render
 - Python (pandas (para procesar dataset de Kaggle))

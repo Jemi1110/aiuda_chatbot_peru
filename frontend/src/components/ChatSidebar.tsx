@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { 
   MessageSquare, 
@@ -10,6 +9,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import {
   Sidebar,
   SidebarContent,
@@ -29,10 +29,11 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-interface ChatHistory {
-  id: number;
+interface Chat {
+  id: string;
   title: string;
-  date: string;
+  created_at: string;
+  user_id: string;
 }
 
 const ChatSidebar = () => {
@@ -40,35 +41,39 @@ const ChatSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [chatHistories, setChatHistories] = useState<ChatHistory[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulamos carga de historiales de chat
-    setTimeout(() => {
-      setChatHistories([
-        {
-          id: 1,
-          title: "Consulta sobre dolor de cabeza",
-          date: "12/04/2025"
-        },
-        {
-          id: 2,
-          title: "Información sobre medicamentos",
-          date: "10/04/2025"
-        },
-        {
-          id: 3,
-          title: "Síntomas de gripe",
-          date: "08/04/2025"
-        }
-      ]);
-      setIsLoading(false);
-    }, 800);
-  }, []);
+    if (user) {
+      loadChats();
+    }
+  }, [user]);
 
-  const isActive = (chatId: number) => {
-    // Lógica para determinar si este chat está activo
+  const loadChats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chats')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setChats(data || []);
+    } catch (error) {
+      console.error('Error loading chats:', error);
+      toast({
+        title: "Error",
+        description: "Error al cargar el historial de chats",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const isActive = (chatId: string) => {
     return location.search === `?chat=${chatId}`;
   };
   
@@ -80,92 +85,112 @@ const ChatSidebar = () => {
     });
   };
   
-  const handleDeleteChat = (id: number, e: React.MouseEvent) => {
+  const handleDeleteChat = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    setChatHistories(prev => prev.filter(chat => chat.id !== id));
-    toast({
-      title: "Conversación eliminada",
-      description: "La conversación ha sido eliminada correctamente"
-    });
+    try {
+      // First delete all messages associated with this chat
+      const { error: messagesError } = await supabase
+        .from('chat_history')
+        .delete()
+        .eq('chat_id', id);
+
+      if (messagesError) throw messagesError;
+
+      // Then delete the chat
+      const { error: chatError } = await supabase
+        .from('chats')
+        .delete()
+        .eq('id', id);
+
+      if (chatError) throw chatError;
+
+      setChats(prev => prev.filter(chat => chat.id !== id));
+      
+      // If the deleted chat was the current one, redirect to new chat
+      if (location.search === `?chat=${id}`) {
+        navigate('/profile#chat');
+      }
+
+      toast({
+        title: "Conversación eliminada",
+        description: "La conversación y sus mensajes han sido eliminados correctamente"
+      });
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      toast({
+        title: "Error",
+        description: "Error al eliminar la conversación",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
-    <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r bg-muted/10">
-      <SidebarHeader className="p-3">
+    <div className="h-full flex flex-col">
+      <div className="p-3 border-b">
         <Button className="w-full bg-aiuda-coral hover:bg-aiuda-coral/90 flex items-center gap-2" onClick={handleNewChat}>
           <Plus size={16} />
           <span>Nueva consulta</span>
         </Button>
-      </SidebarHeader>
+      </div>
 
-      <SidebarContent>
-        <ScrollArea className="h-[calc(100vh-120px)]">
-          <div className="mb-2 px-3 py-2">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CONSULTAS RECIENTES</h3>
-          </div>
-          
-          <SidebarMenu>
+      <div className="flex-1 overflow-hidden">
+        <div className="mb-2 px-3 py-2">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CONSULTAS RECIENTES</h3>
+        </div>
+        
+        <ScrollArea className="h-[calc(100vh-12rem)]">
+          <div className="px-3">
             {isLoading ? (
-              <div className="px-4 py-2 text-sm text-muted-foreground">Cargando historiales...</div>
-            ) : chatHistories.length > 0 ? (
-              <>
-                {chatHistories.map((chat) => (
-                  <SidebarMenuItem key={chat.id}>
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={isActive(chat.id)}
-                      className="group transition-all hover:bg-muted/50 rounded-md px-3 py-2"
-                    >
-                      <Link to={`/profile?chat=${chat.id}#chat`} className="flex items-start gap-2">
-                        <MessageSquare size={16} className="mt-1 shrink-0" />
-                        <div className="flex flex-col overflow-hidden">
-                          <span className="truncate font-medium">{chat.title}</span>
-                          <span className="text-xs text-muted-foreground">{chat.date}</span>
-                        </div>
-                      </Link>
-                    </SidebarMenuButton>
-                    
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <SidebarMenuAction
-                            onClick={(e) => handleDeleteChat(chat.id, e)}
-                            showOnHover
-                            className="hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 size={14} />
-                          </SidebarMenuAction>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Eliminar conversación
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </SidebarMenuItem>
-                ))}
-                
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location.hash === "#history"}
-                    className="mt-2 hover:bg-muted/50 rounded-md px-3 py-2"
-                  >
-                    <Link to="/profile?tab=history#history">
-                      <Calendar size={16} />
-                      <span>Ver historial completo</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </>
+              <div className="py-2 text-sm text-muted-foreground">Cargando historiales...</div>
+            ) : chats.length === 0 ? (
+              <div className="py-2 text-sm text-muted-foreground">No hay consultas recientes</div>
             ) : (
-              <div className="px-4 py-2 text-sm text-muted-foreground">No hay conversaciones previas</div>
+              chats.map((chat) => (
+                <div key={chat.id} className="group relative">
+                  <Link 
+                    to={`/profile?chat=${chat.id}#chat`} 
+                    className={`flex items-start gap-2 p-2 rounded-md transition-colors ${
+                      isActive(chat.id) 
+                        ? 'bg-aiuda-coral/10 text-aiuda-coral' 
+                        : 'hover:bg-muted/50'
+                    }`}
+                  >
+                    <MessageSquare size={16} className="mt-1 shrink-0" />
+                    <div className="flex flex-col overflow-hidden flex-1">
+                      <span className="truncate font-medium">{chat.title}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(chat.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </Link>
+                  
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => handleDeleteChat(chat.id, e)}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Eliminar conversación
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              ))
             )}
-          </SidebarMenu>
+          </div>
         </ScrollArea>
-      </SidebarContent>
-    </Sidebar>
+      </div>
+    </div>
   );
 };
 

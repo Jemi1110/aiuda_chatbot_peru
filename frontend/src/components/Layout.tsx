@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "react-router-dom";
@@ -22,16 +21,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     location.pathname.includes('/profile') && 
     (location.hash === '#chat' || location.search.includes('chat='));
   
+  if (isAuthPage) {
+    return (
+      <div className="min-h-screen w-screen">
+        {children}
+      </div>
+    );
+  }
+  
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        {/* Only show the ChatSidebar on profile pages with chat sections */}
-        {showChatSidebar && <ChatSidebar />}
-        
-        <div className="flex flex-col min-h-full flex-1">
-        {!isAuthPage && <Navbar />}
-          <main className={`flex-1 ${isAuthPage ? '' : ''}`}>
-            {children}
+      <div className="min-h-screen bg-background w-full">
+        <Navbar />
+        <div className="flex h-[calc(100vh-4rem)] w-full">
+          {showChatSidebar && (
+            <div className="hidden md:block w-80 border-r bg-muted/10 overflow-y-auto">
+              <div className="h-full">
+                <ChatSidebar />
+              </div>
+            </div>
+          )}
+          <main className="flex-1 overflow-y-auto w-full">
+            <div className="h-full w-full">
+              {children}
+            </div>
           </main>
         </div>
       </div>

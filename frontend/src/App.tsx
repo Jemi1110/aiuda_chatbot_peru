@@ -10,9 +10,11 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import { AuthProvider } from "./contexts/AuthContext";
 import PrivateRoute from "./components/PrivateRoute";
 import Layout from "./components/Layout";
+import { ChatbotProvider } from "./contexts/ChatbotContext";
 
 const App = () => {
   const queryClient = new QueryClient();
@@ -21,27 +23,37 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route 
-                  path="/profile" 
-                  element={
-                    <PrivateRoute>
-                      <Profile />
-                    </PrivateRoute>
-                  } 
-                />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Layout>
-          </BrowserRouter>
+          <ChatbotProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route 
+                    path="/profile" 
+                    element={
+                      <PrivateRoute>
+                        <Profile />
+                      </PrivateRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/settings" 
+                    element={
+                      <PrivateRoute>
+                        <Settings />
+                      </PrivateRoute>
+                    } 
+                  />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Layout>
+            </BrowserRouter>
+          </ChatbotProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

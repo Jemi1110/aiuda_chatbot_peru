@@ -23,11 +23,36 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await signIn(email, password);
-    if (!error) {
-      navigate("/");
+    
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        console.error('Login error:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Error al iniciar sesión",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Esperar un poco para asegurarnos de que el estado se actualice
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Redirigir a /profile después de iniciar sesión
+      navigate("/profile", { replace: true });
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Error",
+        description: "Error al iniciar sesión",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
