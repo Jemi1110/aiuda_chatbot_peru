@@ -40,5 +40,8 @@
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 }

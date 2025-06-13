@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   signIn: (email: string, password: string) => Promise<{
     error: Error | null;
   }>;
@@ -83,6 +84,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
 >>>>>>> Stashed changes
+=======
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+
+  // Handle login with email and password
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+>>>>>>> Stashed changes
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -90,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) throw error;
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 
       toast({
@@ -110,6 +132,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // PARA GUARDAR DATOS EN MI TABLA REGISTRATION
   const signUp = async (email: string, password: string) => {
+=======
+      
+      if (data?.user) {
+        setUser({
+          id: data.user.id,
+          email: data.user.email!,
+          name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0],
+          avatar_url: data.user.user_metadata?.avatar_url,
+        });
+      }
+      
+      navigate('/chat');
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Error al iniciar sesión',
+        variant: 'destructive',
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle user registration
+  const register = async (name: string, email: string, password: string) => {
+    setIsLoading(true);
+>>>>>>> Stashed changes
 =======
       
       if (data?.user) {
@@ -374,6 +425,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     session,
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     signIn,
     signUp,
     signOut,
@@ -391,6 +443,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     resetPassword,
   };
+=======
+    isLoading,
+    login,
+    register,
+    logout,
+    resetPassword,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+>>>>>>> Stashed changes
 
   return (
     <AuthContext.Provider value={value}>
@@ -404,15 +471,21 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
 =======
+=======
+>>>>>>> Stashed changes
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 }
 
 export default AuthContext;
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
